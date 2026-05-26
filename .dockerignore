@@ -1,0 +1,23 @@
+# Dependencias y caché de build
+node_modules
+.next
+
+# Control de versiones
+.git
+.gitignore
+
+# Variables de entorno locales (las inyecta docker-compose)
+.env
+.env.local
+.env.development
+.env.production
+
+# Archivos de desarrollo y documentación
+*.md
+.eslintrc*
+eslint.config.*
+
+# Archivos de Docker (no se necesitan dentro de la imagen)
+Dockerfile
+docker-compose.yml
+!entrypoint.sh

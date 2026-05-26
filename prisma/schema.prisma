@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model users {
+  id_user         String      @id @db.Char(64)
+  username        String      @unique @db.VarChar(20)
+  email           String      @unique @db.VarChar(50)
+  psw_hash        String      @db.VarChar(72)
+  name            String      @db.VarChar(15)
+  surnames        String      @db.VarChar(30)
+  description     String?     @db.VarChar(100)
+  location        String?     @db.VarChar(100)
+  country         String      @db.VarChar(15)
+  language        String?     @default("es") @db.VarChar(2)
+  born_date       DateTime    @db.Date
+  register_date   DateTime    @default(now()) @db.Timestamp(6)
+  role            String      @default("user") @db.VarChar(5)
+  status          Boolean     @default(true)
+  penalties_count Int         @default(0)
+
+  activities          activities[]
+  exchanges_requested exchanges[]    @relation("ExchangeRequester")
+  exchanges_targeted  exchanges[]    @relation("ExchangeTarget")
+  reviews_written     reviews[]      @relation("ReviewsWritten")
+  reviews_received    reviews[]      @relation("ReviewsReceived")
+  penalties           penalties[]    @relation("UserPenalties")
+  penalties_given     penalties[]    @relation("AdminPenalties")
+  participants        participants[]
+  messages_sent       messages[]
+
+  friends             contacts[]     @relation("UserFriends")
+  friended_by         contacts[]     @relation("UserFriendedBy")
+}
+
+model contacts {
+  id_user        String @db.Char(64)
+  friend_id_user String @db.Char(64)
+
+  user   users @relation("UserFriends", fields: [id_user], references: [id_user], onDelete: Cascade)
+  friend users @relation("UserFriendedBy", fields: [friend_id_user], references: [id_user], onDelete: Cascade)
+
+  @@id([id_user, friend_id_user])
+}
+
+model activities {
+  id_activity Int       @id @default(autoincrement())
+  id_user     String    @db.Char(64)
+  name        String    @db.VarChar(50)
+  description String    @db.VarChar(250)
+  topic       String    @db.VarChar(15)
+  type        String    @db.VarChar(15)
+  date        DateTime? @db.Timestamp(6)
+  location    String?   @db.VarChar(100)
+  latitude    Decimal?  @db.Decimal(10, 8)
+  longitude   Decimal?  @db.Decimal(11, 8)
+  status      String    @default("active") @db.VarChar(11)
+
+  user                users       @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+  exchanges_requested exchanges[] @relation("ActivityRequested")
+  exchanges_offered   exchanges[] @relation("ActivityOffered")
+}
+
+model exchanges {
+  id_exchange        Int       @id @default(autoincrement())
+  requester_id_user  String    @db.Char(64)
+  target_id_user     String    @db.Char(64)
+  requested_activity Int
+  offered_activity   Int
+  status             String    @default("pending") @db.VarChar(9)
+  chain_id           Int?
+  creation_date      DateTime  @default(now()) @db.Timestamp(6)
+
+  requester    users         @relation("ExchangeRequester", fields: [requester_id_user], references: [id_user])
+  target       users         @relation("ExchangeTarget", fields: [target_id_user], references: [id_user])
+  activity_req activities    @relation("ActivityRequested", fields: [requested_activity], references: [id_activity])
+  activity_off activities    @relation("ActivityOffered", fields: [offered_activity], references: [id_activity])
+  conversations conversations[]
+  reviews      reviews[]
+  penalties    penalties[]
+}
+
+model reviews {
+  id_review       Int      @id @default(autoincrement())
+  written_by      String   @db.Char(64)
+  written_to_user String   @db.Char(64)
+  id_exchange     Int
+  content         String   @db.VarChar(250)
+  valoration      Int
+  date            DateTime @default(now()) @db.Timestamp(6)
+  is_flagged      Boolean  @default(false)
+
+  author    users     @relation("ReviewsWritten", fields: [written_by], references: [id_user])
+  recipient users     @relation("ReviewsReceived", fields: [written_to_user], references: [id_user])
+  exchange  exchanges @relation(fields: [id_exchange], references: [id_exchange], onDelete: Cascade)
+  penalties penalties[]
+
+  @@unique([written_by, id_exchange])
+}
+
+model conversations {
+  id_conversation Int      @id @default(autoincrement())
+  id_exchange     Int?
+  type            String   @db.VarChar(15)
+  creation_date   DateTime @default(now()) @db.Timestamp(6)
+
+  exchange     exchanges?     @relation(fields: [id_exchange], references: [id_exchange], onDelete: SetNull)
+  participants participants[]
+  messages     messages[]
+}
+
+model participants {
+  id_conversation Int
+  id_user         String @db.Char(64)
+  rol             String @default("member") @db.VarChar(10)
+
+  conversation conversations @relation(fields: [id_conversation], references: [id_conversation], onDelete: Cascade)
+  user         users         @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+
+  @@id([id_conversation, id_user])
+}
+
+model messages {
+  id_message      Int      @id @default(autoincrement())
+  id_conversation Int
+  id_user_sender  String   @db.Char(64)
+  content         String?  @db.VarChar(500)
+  attachment_url  String?  @db.VarChar(255)
+  send_at         DateTime @default(now()) @db.Timestamp(6)
+
+  conversation conversations @relation(fields: [id_conversation], references: [id_conversation], onDelete: Cascade)
+  sender       users         @relation(fields: [id_user_sender], references: [id_user])
+}
+
+model penalties {
+  id_penalty    Int       @id @default(autoincrement())
+  id_user       String    @db.Char(64)
+  admin_id_user String?   @db.Char(64)
+  id_review     Int?
+  id_exchange   Int?
+  reason        String    @db.VarChar(500)
+  given_at      DateTime  @default(now()) @db.Timestamp(6)
+  expires_at    DateTime?
+
+  user     users      @relation("UserPenalties", fields: [id_user], references: [id_user], onDelete: Cascade)
+  admin    users?     @relation("AdminPenalties", fields: [admin_id_user], references: [id_user])
+  review   reviews?   @relation(fields: [id_review], references: [id_review])
+  exchange exchanges? @relation(fields: [id_exchange], references: [id_exchange])
+}
