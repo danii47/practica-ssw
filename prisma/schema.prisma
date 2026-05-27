@@ -73,9 +73,11 @@ model exchanges {
   target_id_user     String    @db.Char(64)
   requested_activity Int
   offered_activity   Int
-  status             String    @default("pending") @db.VarChar(9)
-  chain_id           Int?
-  creation_date      DateTime  @default(now()) @db.Timestamp(6)
+  status                String    @default("pending") @db.VarChar(9)
+  requester_completed   Boolean   @default(false)
+  target_completed      Boolean   @default(false)
+  chain_id              Int?
+  creation_date         DateTime  @default(now()) @db.Timestamp(6)
 
   requester    users         @relation("ExchangeRequester", fields: [requester_id_user], references: [id_user])
   target       users         @relation("ExchangeTarget", fields: [target_id_user], references: [id_user])

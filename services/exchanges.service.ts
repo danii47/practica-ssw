@@ -1,5 +1,5 @@
 import prisma from "@/lib/db";
-import { BadRequestError, NotFoundError } from "@/lib/api-error";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/lib/api-error";
 import { getOrCreateConversation, sendMessage } from "@/services/chat.service";
 
 export interface CreateExchangeInput {
@@ -54,6 +54,16 @@ export async function createExchange(data: CreateExchangeInput) {
   }
   if (actRequested.status !== "active" || actOffered.status !== "active") {
     throw new BadRequestError("Una o ambas actividades no están activas.");
+  }
+
+  const targetUser = await prisma.users.findUnique({
+    where: { id_user: data.target_id_user },
+    select: { role: true },
+  });
+  if (targetUser?.role === "admin") {
+    throw new ForbiddenError(
+      "No puedes proponer un intercambio con una cuenta del sistema."
+    );
   }
 
   const exchange = await prisma.exchanges.create({
@@ -118,19 +128,48 @@ export async function updateExchangeStatus(
   });
   if (!exchange) throw new NotFoundError("Intercambio");
 
-  if (
-    (status === "accepted" || status === "refused") &&
-    exchange.target_id_user !== userId
-  ) {
+  const isRequester = exchange.requester_id_user === userId;
+  const isTarget = exchange.target_id_user === userId;
+
+  if (!isRequester && !isTarget) {
+    throw new ForbiddenError("No tienes permiso para modificar este intercambio.");
+  }
+
+  if ((status === "accepted" || status === "refused") && !isTarget) {
     throw new BadRequestError(
       "Solo el destinatario puede aceptar o rechazar esta propuesta.",
     );
   }
 
-  if (status === "completed" && exchange.status !== "accepted") {
-    throw new BadRequestError(
-      "Solo se pueden completar intercambios previamente aceptados.",
-    );
+  if (status === "completed") {
+    if (exchange.status !== "accepted") {
+      throw new BadRequestError(
+        "Solo se pueden completar intercambios previamente aceptados.",
+      );
+    }
+
+    // Set the caller's confirmation flag
+    const updateData: {
+      requester_completed?: boolean;
+      target_completed?: boolean;
+      status?: string;
+    } = isRequester
+      ? { requester_completed: true }
+      : { target_completed: true };
+
+    // If the other party already confirmed, also mark the exchange as completed
+    const otherAlreadyConfirmed = isRequester
+      ? exchange.target_completed
+      : exchange.requester_completed;
+
+    if (otherAlreadyConfirmed) {
+      updateData.status = "completed";
+    }
+
+    return prisma.exchanges.update({
+      where: { id_exchange: exchangeId },
+      data: updateData,
+    });
   }
 
   return prisma.exchanges.update({

@@ -38,11 +38,6 @@ export default function CommunityPage() {
   const [selected, setSelected] = useState<User | null>(null);
   const [contactMap, setContactMap] = useState<Record<string, ContactStatus>>({});
   const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [myId, setMyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('/api/auth/me').then((r) => r.ok ? r.json() : null).then((d) => { if (d) setMyId(d.id_user); }).catch(() => {});
-  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -190,8 +185,7 @@ export default function CommunityPage() {
                       <span className="font-bold text-ink-soft">{selected.services_count}</span> {selected.services_count === 1 ? 'servicio activo' : 'servicios activos'}
                     </p>
 
-                    {selected.id_user !== myId && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-7">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-7">
                         <Link
                           href={`/user/${selected.id_user}`}
                           className="flex items-center justify-center gap-2 px-4 py-2.5 gradient-brand text-white rounded-xl text-sm font-bold shadow-brand hover:shadow-lg transition-all btn-press"
@@ -236,7 +230,6 @@ export default function CommunityPage() {
                           Intercambio
                         </button>
                       </div>
-                    )}
                   </div>
                 </div>
 

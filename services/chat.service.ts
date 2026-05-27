@@ -2,6 +2,16 @@ import prisma from "@/lib/db";
 import { BadRequestError, ForbiddenError } from "@/lib/api-error";
 
 export async function getOrCreateConversation(userId1: string, userId2: string) {
+  const targetUser = await prisma.users.findUnique({
+    where: { id_user: userId2 },
+    select: { role: true },
+  });
+  if (targetUser?.role === "admin") {
+    throw new ForbiddenError(
+      "No puedes iniciar una conversación con una cuenta del sistema."
+    );
+  }
+
   const existing = await prisma.conversations.findFirst({
     where: {
       type: "direct",

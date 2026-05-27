@@ -47,21 +47,31 @@ export async function isContact(userId: string, friendId: string): Promise<boole
 export async function getUserContacts(userId: string) {
   const relations = await prisma.contacts.findMany({
     where: { id_user: userId },
-    select: { friend_id_user: true }
+    select: { friend_id_user: true },
   });
 
-  const friendIds = relations.map(r => r.friend_id_user);
+  const friendIds = relations.map((r) => r.friend_id_user);
 
-  return prisma.users.findMany({
+  const users = await prisma.users.findMany({
     where: { id_user: { in: friendIds } },
     select: {
       id_user: true,
       name: true,
       surnames: true,
       username: true,
-      location: true
-    }
+      location: true,
+      _count: { select: { activities: true } },
+    },
   });
+
+  return users.map((u) => ({
+    id_user: u.id_user,
+    full_name: `${u.name} ${u.surnames}`,
+    username: u.username,
+    initial: u.name.charAt(0).toUpperCase(),
+    location: u.location,
+    services_count: u._count.activities,
+  }));
 }
 
 export async function removeContact(userId: string, friendId: string) {

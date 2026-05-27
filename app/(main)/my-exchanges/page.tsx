@@ -26,6 +26,8 @@ interface RawExchange {
   creation_date: string;
   requester_id_user: string;
   target_id_user: string;
+  requester_completed: boolean;
+  target_completed: boolean;
   requester: RawUser;
   target: RawUser;
   activity_req: RawActivity | null;
@@ -358,20 +360,35 @@ export default function MyExchangesPage() {
                           </span>
                         )}
 
-                        {ex.status === 'accepted' && (
-                          <button
-                            onClick={() => handleAction(ex.id_exchange, 'completed')}
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors btn-press disabled:opacity-50 flex items-center gap-1.5"
-                          >
-                            {isLoading ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            )}
-                            Marcar completado
-                          </button>
-                        )}
+                        {ex.status === 'accepted' && (() => {
+                          const myConfirmed = isCreator ? ex.requester_completed : ex.target_completed;
+                          if (myConfirmed) {
+                            return (
+                              <span className="text-xs text-muted italic flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Esperando confirmación de {counterpart?.name ?? 'usuario'}…
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={() => handleAction(ex.id_exchange, 'completed')}
+                              disabled={isLoading}
+                              className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors btn-press disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {isLoading ? (
+                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                              Confirmar completado
+                            </button>
+                          );
+                        })()}
 
                         {ex.status === 'completed' && !myReview && (
                           <button

@@ -3,8 +3,12 @@ import { NotFoundError, ConflictError, BadRequestError } from '@/lib/api-error';
 
 // ─── List / Search ────────────────────────────────────────────────────────────
 
-export async function listUsers(search?: string | null) {
-  const where: NonNullable<Parameters<typeof prisma.users.findMany>[0]>['where'] = { status: true };
+export async function listUsers(search?: string | null, excludeUserId?: string) {
+  const where: NonNullable<Parameters<typeof prisma.users.findMany>[0]>['where'] = {
+    status: true,
+    role: { not: 'admin' },
+    ...(excludeUserId ? { id_user: { not: excludeUserId } } : {}),
+  };
 
   if (search) {
     where.OR = [
