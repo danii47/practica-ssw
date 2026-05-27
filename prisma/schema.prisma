@@ -84,6 +84,7 @@ model exchanges {
   conversations conversations[]
   reviews      reviews[]
   penalties    penalties[]
+  messages     messages[]    @relation("MessageExchange")
 }
 
 model reviews {
@@ -132,10 +133,13 @@ model messages {
   id_user_sender  String   @db.Char(64)
   content         String?  @db.VarChar(500)
   attachment_url  String?  @db.VarChar(255)
+  id_exchange     Int?
+  is_read         Boolean  @default(false)
   send_at         DateTime @default(now()) @db.Timestamp(6)
 
   conversation conversations @relation(fields: [id_conversation], references: [id_conversation], onDelete: Cascade)
   sender       users         @relation(fields: [id_user_sender], references: [id_user])
+  exchange     exchanges?    @relation("MessageExchange", fields: [id_exchange], references: [id_exchange], onDelete: SetNull)
 }
 
 model penalties {

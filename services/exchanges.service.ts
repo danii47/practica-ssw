@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { BadRequestError, NotFoundError } from "@/lib/api-error";
+import { getOrCreateConversation, sendMessage } from "@/services/chat.service";
 
 export interface CreateExchangeInput {
   requester_id_user: string;
@@ -73,6 +74,13 @@ export async function createExchange(data: CreateExchangeInput) {
       offered_activity: true,
     },
   });
+
+  // Auto-create conversation and send the exchange as an embedded message
+  const conv = await getOrCreateConversation(
+    data.requester_id_user,
+    data.target_id_user
+  );
+  await sendMessage(conv.id_conversation, data.requester_id_user, null, exchange.id_exchange);
 
   return exchange;
 }
