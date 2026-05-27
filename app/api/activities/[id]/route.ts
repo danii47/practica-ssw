@@ -1,4 +1,4 @@
-import { updateActivity } from '@/services/activities.service';
+import { updateActivity, deleteActivity } from '@/services/activities.service';
 import { ok, handleError } from '@/lib/api-response';
 import { BadRequestError, ForbiddenError } from '@/lib/api-error';
 import { requireAuth } from '@/lib/require-auth';
@@ -36,6 +36,23 @@ export async function PUT(
     });
 
     return ok(activity);
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await requireAuth();
+    const { id } = await params;
+    const activityId = parseInt(id, 10);
+    if (isNaN(activityId)) throw new BadRequestError('ID de actividad inválido.');
+
+    await deleteActivity(activityId, session.sub);
+    return ok({ ok: true });
   } catch (error) {
     return handleError(error);
   }

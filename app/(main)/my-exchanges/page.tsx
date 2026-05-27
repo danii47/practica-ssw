@@ -291,7 +291,7 @@ export default function MyExchangesPage() {
                             <p className="font-bold text-ink text-sm group-hover:text-brand transition-colors">
                               {counterpart ? `${counterpart.name} ${counterpart.surnames}` : 'Usuario'}
                             </p>
-                            <p className="text-xs text-muted">
+                            <p className="text-xs text-muted" suppressHydrationWarning>
                               {isCreator ? 'Tú propusiste' : 'Te propuso'} ·{' '}
                               {new Date(ex.creation_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ExchangeModal from '@/components/ExchangeModal';
 import { TOPICS, topicStyle } from '@/lib/topics';
@@ -37,15 +38,25 @@ function avatarColor(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-export default function HomePage() {
+function HomePageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [draftSearch, setDraftSearch] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterTopic, setFilterTopic] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const [draftSearch, setDraftSearch] = useState(() => searchParams.get('q') ?? '');
+  const [filterType, setFilterType] = useState(() => searchParams.get('type') ?? '');
+  const [filterTopic, setFilterTopic] = useState(() => searchParams.get('topic') ?? '');
   const [myId, setMyId] = useState<string | null>(null);
   const [exchangeTarget, setExchangeTarget] = useState<{ id: string; name: string } | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -53,6 +64,15 @@ export default function HomePage() {
       .then((data) => { if (data) setMyId(data.id_user); })
       .catch(() => {});
   }, []);
+
+  function pushParams(params: { search: string; type: string; topic: string }) {
+    const sp = new URLSearchParams();
+    if (params.search) sp.set('q', params.search);
+    if (params.type) sp.set('type', params.type);
+    if (params.topic) sp.set('topic', params.topic);
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
 
   const fetchActivities = useCallback(async () => {
     setLoading(true);
@@ -73,9 +93,39 @@ export default function HomePage() {
     fetchActivities();
   }, [fetchActivities]);
 
+  function handleDraftChange(value: string) {
+    setDraftSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      pushParams({ search: value, type: filterType, topic: filterTopic });
+    }, 400);
+  }
+
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearch(draftSearch);
+    pushParams({ search: draftSearch, type: filterType, topic: filterTopic });
+  }
+
+  function handleFilterType(value: string) {
+    setFilterType(value);
+    pushParams({ search, type: value, topic: filterTopic });
+  }
+
+  function handleFilterTopic(value: string) {
+    setFilterTopic(value);
+    pushParams({ search, type: filterType, topic: value });
+  }
+
+  function handleClear() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setFilterType('');
+    setFilterTopic('');
+    setSearch('');
+    setDraftSearch('');
+    router.replace(pathname, { scroll: false });
   }
 
   const hasFilters = !!(filterType || filterTopic || search);
@@ -100,7 +150,7 @@ export default function HomePage() {
             <input
               type="search"
               value={draftSearch}
-              onChange={(e) => setDraftSearch(e.target.value)}
+              onChange={(e) => handleDraftChange(e.target.value)}
               placeholder="Buscar habilidades, servicios o usuarios…"
               className="w-full pl-11 pr-4 py-2.5 bg-canvas border border-hairline rounded-full focus:outline-none focus:ring-2 focus:ring-brand focus:bg-surface transition-all text-sm placeholder-muted-soft"
               aria-label="Buscar"
@@ -110,7 +160,7 @@ export default function HomePage() {
 
         <div className="px-6 md:px-10 pb-4 flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setFilterTopic('')}
+            onClick={() => handleFilterTopic('')}
             className={`px-3.5 py-1.5 text-xs font-bold rounded-full border transition-all btn-press ${
               filterTopic === ''
                 ? 'bg-ink text-white border-ink'
@@ -125,7 +175,7 @@ export default function HomePage() {
             return (
               <button
                 key={t}
-                onClick={() => setFilterTopic(active ? '' : t)}
+                onClick={() => handleFilterTopic(active ? '' : t)}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-full border transition-all btn-press flex items-center gap-1.5 ${
                   active
                     ? `${s.tintBg} ${s.tintBorder} ${s.tintText} shadow-soft`
@@ -140,7 +190,7 @@ export default function HomePage() {
           <div className="w-px h-6 bg-hairline mx-1.5" />
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(e) => handleFilterType(e.target.value)}
             className="appearance-none bg-surface border border-hairline text-ink-soft py-1.5 pl-3.5 pr-8 rounded-full text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer hover:border-brand transition-colors"
             style={{ backgroundImage: "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '14px' }}
           >
@@ -150,7 +200,7 @@ export default function HomePage() {
           </select>
           {hasFilters && (
             <button
-              onClick={() => { setFilterType(''); setFilterTopic(''); setSearch(''); setDraftSearch(''); }}
+              onClick={handleClear}
               className="px-3.5 py-1.5 text-xs font-bold text-muted bg-canvas rounded-full hover:bg-hairline-soft transition-colors btn-press flex items-center gap-1.5"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -192,7 +242,7 @@ export default function HomePage() {
             <p className="text-sm text-muted mb-5">Prueba con otros filtros o términos de búsqueda.</p>
             {hasFilters && (
               <button
-                onClick={() => { setFilterType(''); setFilterTopic(''); setSearch(''); setDraftSearch(''); }}
+                onClick={handleClear}
                 className="px-4 py-2 bg-brand text-white text-sm font-bold rounded-lg hover:bg-brand-dark transition-colors btn-press"
               >
                 Quitar filtros
@@ -255,8 +305,8 @@ export default function HomePage() {
                       )}
                     </Link>
 
-                    <h3 className="text-base font-bold text-ink mb-1.5 leading-snug line-clamp-2">{activity.name}</h3>
-                    <p className="text-sm text-muted mb-4 line-clamp-3 leading-relaxed">{activity.description}</p>
+                    <h3 className="text-base font-bold text-ink mb-1.5 leading-snug line-clamp-2 break-words">{activity.name}</h3>
+                    <p className="text-sm text-muted mb-4 line-clamp-3 leading-relaxed break-words">{activity.description}</p>
 
                     <div className="mt-auto">
                       {isMine ? (
@@ -295,5 +345,13 @@ export default function HomePage() {
         />
       )}
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageContent />
+    </Suspense>
   );
 }

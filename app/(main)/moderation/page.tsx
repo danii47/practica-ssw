@@ -226,7 +226,7 @@ export default function ModerationPage() {
                             <p className="text-[10px] text-muted">@{review.receiver.username}</p>
                           </div>
                         </Link>
-                        <span className="ml-auto text-[11px] text-muted-soft">
+                        <span className="ml-auto text-[11px] text-muted-soft" suppressHydrationWarning>
                           {new Date(review.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       </div>

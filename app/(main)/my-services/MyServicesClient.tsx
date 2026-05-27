@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { TOPICS, topicStyle } from '@/lib/topics';
 
 type Activity = {
@@ -21,14 +22,38 @@ const emptyForm = { name: '', description: '', topic: 'Informática', type: 'onl
 
 export default function MyServicesClient({ activities }: { activities: Activity[] }) {
   const router = useRouter();
+
+  // ── Edit/Create modal ─────────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<ModalMode>('create');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // ── Toggle (pause/activate) ───────────────────────────────────────────────
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
+
+  // ── Portal mount guard ────────────────────────────────────────────────────
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  // Auto-dismiss toast after 3.5 s
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Escape to close edit/create modal
   useEffect(() => {
     if (!modalOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); };
@@ -36,6 +61,15 @@ export default function MyServicesClient({ activities }: { activities: Activity[
     return () => window.removeEventListener('keydown', handler);
   }, [modalOpen]);
 
+  // Escape to close delete confirm modal
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setConfirmDelete(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [confirmDelete]);
+
+  // ── Edit/Create handlers ──────────────────────────────────────────────────
   function openCreate() {
     setMode('create');
     setEditingId(null);
@@ -88,6 +122,7 @@ export default function MyServicesClient({ activities }: { activities: Activity[
     }
   }
 
+  // ── Toggle handler ────────────────────────────────────────────────────────
   async function handleToggle(activity: Activity) {
     setTogglingId(activity.id_activity);
     try {
@@ -101,10 +136,30 @@ export default function MyServicesClient({ activities }: { activities: Activity[
     }
   }
 
+  // ── Delete handler ────────────────────────────────────────────────────────
+  async function handleDelete(activity: Activity) {
+    setDeletingId(activity.id_activity);
+    try {
+      const res = await fetch(`/api/activities/${activity.id_activity}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'No se pudo eliminar el servicio.');
+      setDeletedIds((prev) => new Set(prev).add(activity.id_activity));
+      setToast({ msg: 'Servicio eliminado correctamente.', kind: 'success' });
+      setConfirmDelete(null);
+    } catch (err) {
+      setToast({ msg: err instanceof Error ? err.message : 'Error inesperado.', kind: 'error' });
+      setConfirmDelete(null);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const selectedStyle = topicStyle(form.topic);
+  const visibleActivities = activities.filter((a) => !deletedIds.has(a.id_activity));
 
   return (
     <>
+      {/* ── Grid ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <button
           onClick={openCreate}
@@ -120,10 +175,11 @@ export default function MyServicesClient({ activities }: { activities: Activity[
           <span className="relative mt-1 text-xs text-muted">Comparte una habilidad</span>
         </button>
 
-        {activities.map((activity, idx) => {
+        {visibleActivities.map((activity, idx) => {
           const s = topicStyle(activity.topic);
           const isActive = activity.status === 'active';
           const isToggling = togglingId === activity.id_activity;
+          const isDeleting = deletingId === activity.id_activity;
 
           return (
             <article
@@ -152,7 +208,7 @@ export default function MyServicesClient({ activities }: { activities: Activity[
                 <span className={`inline-flex self-start items-center px-2 py-0.5 text-[10px] font-bold rounded-full mb-2 ${s.tintBg} ${s.tintText} ${s.tintBorder} border`}>
                   {activity.topic}
                 </span>
-                <h3 className="text-base font-bold text-ink mb-1 leading-snug">{activity.name}</h3>
+                <h3 className="text-base font-bold text-ink mb-1 leading-snug line-clamp-2 break-words">{activity.name}</h3>
                 <p className="text-sm text-muted mb-3 line-clamp-2 leading-relaxed">{activity.description}</p>
 
                 {activity.location && (
@@ -165,36 +221,56 @@ export default function MyServicesClient({ activities }: { activities: Activity[
                   </p>
                 )}
 
-                <div className="mt-auto grid grid-cols-2 gap-2 pt-3 border-t border-hairline-soft">
+                <div className="mt-auto pt-3 border-t border-hairline-soft">
+                  {/* Primary actions */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => openEdit(activity)}
+                      className="py-2 text-xs font-bold text-brand bg-brand-soft rounded-lg hover:bg-brand hover:text-white transition-all btn-press flex items-center justify-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                      </svg>
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleToggle(activity)}
+                      disabled={isToggling}
+                      className="py-2 text-xs font-bold text-ink-soft bg-canvas border border-hairline rounded-lg hover:bg-hairline-soft transition-colors btn-press disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {isToggling ? (
+                        <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : isActive ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                          </svg>
+                          Pausar
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                          </svg>
+                          Activar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {/* Destructive action — separated visually */}
                   <button
-                    onClick={() => openEdit(activity)}
-                    className="py-2 text-xs font-bold text-brand bg-brand-soft rounded-lg hover:bg-brand hover:text-white transition-all btn-press flex items-center justify-center gap-1.5"
+                    onClick={() => setConfirmDelete(activity)}
+                    disabled={isDeleting}
+                    className="mt-2 w-full py-2 text-xs font-bold text-danger bg-surface border border-red-200 rounded-lg hover:bg-danger-soft transition-colors btn-press disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
-                    </svg>
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleToggle(activity)}
-                    disabled={isToggling}
-                    className="py-2 text-xs font-bold text-ink-soft bg-canvas border border-hairline rounded-lg hover:bg-hairline-soft transition-colors btn-press disabled:opacity-50 flex items-center justify-center gap-1.5"
-                  >
-                    {isToggling ? (
-                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : isActive ? (
-                      <>
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                        </svg>
-                        Pausar
-                      </>
+                    {isDeleting ? (
+                      <span className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                         </svg>
-                        Activar
+                        Eliminar
                       </>
                     )}
                   </button>
@@ -205,6 +281,7 @@ export default function MyServicesClient({ activities }: { activities: Activity[
         })}
       </div>
 
+      {/* ── Create / Edit modal ───────────────────────────────────────────── */}
       {modalOpen && (
         <div
           role="dialog"
@@ -213,8 +290,8 @@ export default function MyServicesClient({ activities }: { activities: Activity[
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-4 animate-fade-in"
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-scale">
-            <div className={`relative px-6 pt-5 pb-5 bg-gradient-to-br ${selectedStyle.gradient} text-white overflow-hidden`}>
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-scale flex flex-col max-h-[90vh]">
+            <div className={`relative px-6 pt-5 pb-5 bg-gradient-to-br ${selectedStyle.gradient} text-white overflow-hidden shrink-0`}>
               <div className="absolute inset-0 bg-noise opacity-30" />
               <div className="relative flex items-center justify-between">
                 <div>
@@ -237,7 +314,7 @@ export default function MyServicesClient({ activities }: { activities: Activity[
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form id="service-modal-form" onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-bold text-ink-soft mb-1.5">
                   Nombre <span className="text-red-500">*</span>
@@ -342,31 +419,106 @@ export default function MyServicesClient({ activities }: { activities: Activity[
                   {error}
                 </div>
               )}
-
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-hairline-soft">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2.5 text-sm font-bold text-ink-soft bg-canvas rounded-xl hover:bg-hairline-soft transition-colors btn-press"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-5 py-2.5 text-sm font-bold text-white gradient-brand rounded-xl shadow-brand hover:shadow-lg transition-all btn-press disabled:opacity-60 flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Guardando…
-                    </>
-                  ) : mode === 'create' ? 'Publicar servicio' : 'Guardar cambios'}
-                </button>
-              </div>
             </form>
+
+            <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-hairline-soft shrink-0 bg-surface">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-4 py-2.5 text-sm font-bold text-ink-soft bg-canvas rounded-xl hover:bg-hairline-soft transition-colors btn-press"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="service-modal-form"
+                disabled={loading}
+                className="px-5 py-2.5 text-sm font-bold text-white gradient-brand rounded-xl shadow-brand hover:shadow-lg transition-all btn-press disabled:opacity-60 flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Guardando…
+                  </>
+                ) : mode === 'create' ? 'Publicar servicio' : 'Guardar cambios'}
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* ── Delete confirmation modal ─────────────────────────────────────── */}
+      {confirmDelete && mounted && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} aria-hidden="true" />
+          <div className="relative bg-surface rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in-scale">
+            <div className="px-6 pt-6 pb-5 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-danger-soft flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+              </div>
+              <h2 id="delete-dialog-title" className="text-base font-bold text-ink mb-1">¿Eliminar este servicio?</h2>
+              <p className="text-sm text-muted mb-1">
+                <span className="font-semibold text-ink-soft">«{confirmDelete.name}»</span>
+              </p>
+              <p className="text-xs text-muted-soft">Esta acción no se puede deshacer. Los servicios con intercambios asociados no podrán eliminarse.</p>
+            </div>
+            <div className="flex gap-2.5 px-6 pb-6">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 px-4 py-2.5 bg-canvas text-ink-soft text-sm font-bold rounded-xl hover:bg-hairline-soft transition-colors btn-press"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete)}
+                disabled={deletingId === confirmDelete.id_activity}
+                className="flex-1 px-4 py-2.5 bg-danger text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all btn-press disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingId === confirmDelete.id_activity ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Toast ─────────────────────────────────────────────────────────── */}
+      {toast && mounted && createPortal(
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg animate-fade-in-scale max-w-xs ${
+            toast.kind === 'success'
+              ? 'bg-success-soft border-emerald-200 text-emerald-700'
+              : 'bg-danger-soft border-red-200 text-red-700'
+          }`}
+        >
+          {toast.kind === 'success' ? (
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          )}
+          <span className="text-sm font-semibold flex-1">{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="shrink-0 opacity-60 hover:opacity-100 transition-opacity" aria-label="Cerrar">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,5 +1,6 @@
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/db';
-import { NotFoundError } from '@/lib/api-error';
+import { NotFoundError, ForbiddenError, BadRequestError } from '@/lib/api-error';
 
 type ActivityType = 'presencial' | 'online';
 
@@ -17,7 +18,13 @@ export async function listActivities(filters: {
     where.topic = filters.topic;
   }
   if (filters.search) {
-    where.name = { contains: filters.search, mode: 'insensitive' };
+    where.OR = [
+      { name:        { contains: filters.search, mode: 'insensitive' } },
+      { description: { contains: filters.search, mode: 'insensitive' } },
+      { user: { name:     { contains: filters.search, mode: 'insensitive' } } },
+      { user: { surnames: { contains: filters.search, mode: 'insensitive' } } },
+      { user: { username: { contains: filters.search, mode: 'insensitive' } } },
+    ];
   }
 
   return prisma.activities.findMany({
@@ -92,6 +99,23 @@ export async function updateActivity(
       location: data.location?.trim() || null,
     },
   });
+}
+
+export async function deleteActivity(activityId: number, userId: string) {
+  const activity = await prisma.activities.findUnique({ where: { id_activity: activityId } });
+  if (!activity) throw new NotFoundError('Actividad');
+  if (activity.id_user !== userId) throw new ForbiddenError();
+
+  try {
+    await prisma.activities.delete({ where: { id_activity: activityId } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      throw new BadRequestError(
+        'No se puede eliminar un servicio que ya tiene intercambios o valoraciones asociadas.'
+      );
+    }
+    throw err;
+  }
 }
 
 export async function toggleActivityStatus(activityId: number, userId: string) {

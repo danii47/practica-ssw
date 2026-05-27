@@ -115,7 +115,7 @@ export default function ExchangeModal({
     >
       <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative bg-surface rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-scale">
+      <div className="relative bg-surface rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-scale flex flex-col max-h-[85vh]">
         <div className="relative gradient-brand text-white px-6 py-5 overflow-hidden">
           <div className="absolute inset-0 bg-noise opacity-30" />
           <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-white/15 blur-2xl" />
@@ -138,7 +138,7 @@ export default function ExchangeModal({
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-5">
+        <div className="px-6 pb-8 pt-5 overflow-y-auto flex-1">
           {fetchLoading ? (
             <div className="bg-surface rounded-xl border border-hairline shadow-soft p-8 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />

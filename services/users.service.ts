@@ -227,6 +227,7 @@ export async function changeUserPassword(id: string, current: string, next: stri
   if (!user) throw new NotFoundError('Usuario');
   const valid = await verifyPassword(current, user.psw_hash);
   if (!valid) throw new BadRequestError('La contraseña actual no es correcta.');
+  if (current === next) throw new BadRequestError('La nueva contraseña no puede ser igual a la actual.');
   if (!next || next.length < 8) {
     throw new BadRequestError('La nueva contraseña debe tener al menos 8 caracteres.');
   }
