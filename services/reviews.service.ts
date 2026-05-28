@@ -2,9 +2,40 @@ import prisma from '@/lib/db';
 import { BadRequestError, NotFoundError, ConflictError, ForbiddenError } from '@/lib/api-error';
 
 const TOXIC_WORDS = [
-  'idiota', 'imbécil', 'estúpido', 'estafador', 'estafa', 'mierda',
-  'basura', 'asqueroso', 'inútil', 'patético', 'tonto', 'cretino',
-  'odio', 'pésimo', 'horrible',
+  'idiota', 'imbécil', 'estúpido', 'estafador', 'estafa', 'mierda', 'basura', 
+  'asqueroso', 'inútil', 'patético', 'tonto', 'cretino', 'odio', 'pésimo', 'horrible',
+  'puta', 'puto', 'putón', 'gilipollas', 'cabrón', 'cabronazo', 'capullo', 'mamón', 
+  'soplapollas', 'soplagaitas', 'joder', 'coño', 'carajo', 'hostia', 'cojones', 
+  'putada', 'jodienda', 'chingada', 'pendejo', 'culero', 'boludo', 'pelotudo', 
+  'forro', 'sorete', 'tarado', 'pajero', 'weón', 'huevón', 'culiado', 'culiao', 
+  'conchetumare', 'chucha', 'pinche', 'baboso', 'gonorrea', 'malparido', 'carechimba', 
+  'pajuo', 'mamaguevo', 'hijoputa', 'hijodeputa', 'malnacido', 
+  'tontolaba', 'cenutrio', 'zoquete', 'zopenco', 'mendrugo', 'ceporro', 'papanatas', 
+  'mentecato', 'lelo', 'lerdo', 'bobo', 'memo', 'simplón', 'descerebrado', 'corto', 
+  'cabezaweba', 'merluzo', 'besugo', 'cebollino', 'melón', 'cazurro', 'burro', 
+  'asno', 'mula', 'idiotez', 'estupidez', 'imbecilidad', 'gilipollez',
+  'canalla', 'sinvergüenza', 'desgraciado', 'miserable', 'ruin', 'mezquino', 
+  'rastrero', 'rata', 'víbora', 'hipócrita', 'falso', 'mentiroso', 'embustero', 
+  'farsante', 'bastardo', 'arpía', 'bruja', 'lagarta', 'infame', 'abyecto', 'vil',
+  'chupóptero', 'chupapollas', 'tocapelotas', 'tocanarices', 'lameculos', 'lamebotas', 
+  'arrastrado', 'pagafantas', 'parásito', 'estorbo', 'pesado', 'plasta', 'cansino', 
+  'plomo', 'mosca', 'acosador', 'hater', 'troll', 'spammer', 'anormal', 'feo', 
+  'fracasado', 'perdedor', 'mediocre', 'pelele', 'mequetrefe', 'mindundi', 'escoria', 
+  'repugnante', 'vomitivo', 'indeseable', 'adefesio', 'cardo', 'orco', 'engendro', 
+  'parguela', 'pringao', 'pringado', 'tirado', 'zarrapastroso', 'piojoso', 'mugriento', 
+  'guarro', 'cerdo', 'cochino', 'marrano', 'asquerosidad', 'podrido', 'apestoso', 
+  'hediondo', 'nauseabundo', 'mierdoso', 'mierdecilla',
+  'timador', 'timo', 'robo', 'ladrón', 'ratero', 'chorizo', 'mangante', 'chupasangres', 
+  'buitre', 'engaño', 'fraude', 'ladrones', 'estafadores',
+  'engreído', 'arrogante', 'prepotente', 'fantasma', 'bocazas', 'chulo', 'payaso', 
+  'ridículo', 'espantapájaros', 'mamarracho', 'cantamañanas', 'vago', 'holgazán', 
+  'perezoso', 'gandul', 'zángano', 'mantenido', 'subnormal',
+  'perro', 'perra', 'zorra', 'ramera', 'prostituta', 'fulana', 'guarra', 'cerda', 
+  'buscona', 'golfa', 'cornudo', 'cornuda', 'machirulo', 'feminazi', 'retrasado',
+  'cabestro', 'bestia', 'energúmeno', 'macarra', 'quinqui', 'choni', 'cani', 
+  'poligonero', 'cateto', 'paleto', 'pueblerino', 'ignorante', 'inculto', 'analfabeto',
+  'maricon', 'maricón', 'marimacho', 'marimacha', 'mariposa', 'mariposón', 'mariposón',
+  'bujarra', 'bollera', 'lesbiana', 'tortillera', 'maricona', 'mariconazo', 'bujarrilla'
 ];
 
 export interface CreateReviewInput {
