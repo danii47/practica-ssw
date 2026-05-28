@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 import { getCurrentUser } from '@/services/users.service';
 import Sidebar from '@/components/Sidebar';
+import WarningModal from '@/components/WarningModal';
 
 async function getSessionUser() {
   try {
@@ -32,6 +33,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
             : null
         }
       />
+      <WarningModal />
       {children}
     </>
   );

@@ -1,45 +1,33 @@
-import { ok, handleError } from "@/lib/api-response";
-import { requireAuth } from "@/lib/require-auth";
-import prisma from "@/lib/db";
-import { ForbiddenError } from "@/lib/api-error";
+import { ok, handleError } from '@/lib/api-response';
+import { requireAdmin } from '@/lib/require-auth';
+import prisma from '@/lib/db';
+import { deleteReviewAndPenalize } from '@/services/moderation.service';
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAuth();
-    const user = await prisma.users.findUnique({
-      where: { id_user: session.sub },
-    });
-    if (user?.role !== "admin") throw new ForbiddenError("No tienes permisos");
-
-    const params = await props.params;
-    await prisma.reviews.delete({ where: { id_review: parseInt(params.id) } });
-
-    return ok({ success: true });
+    const session = await requireAdmin();
+    const { id } = await props.params;
+    const result = await deleteReviewAndPenalize(parseInt(id), session.sub);
+    return ok(result);
   } catch (error) {
     return handleError(error);
   }
 }
 
 export async function PATCH(
-  request: Request,
+  _request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAuth();
-    const user = await prisma.users.findUnique({
-      where: { id_user: session.sub },
-    });
-    if (user?.role !== "admin") throw new ForbiddenError("No tienes permisos");
-
-    const params = await props.params;
+    await requireAdmin();
+    const { id } = await props.params;
     await prisma.reviews.update({
-      where: { id_review: parseInt(params.id) },
+      where: { id_review: parseInt(id) },
       data: { is_flagged: false },
     });
-
     return ok({ success: true });
   } catch (error) {
     return handleError(error);

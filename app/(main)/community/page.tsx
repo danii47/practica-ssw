@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ExchangeModal from '@/components/ExchangeModal';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface User {
   id_user: string;
@@ -38,6 +39,22 @@ export default function CommunityPage() {
   const [selected, setSelected] = useState<User | null>(null);
   const [contactMap, setContactMap] = useState<Record<string, ContactStatus>>({});
   const [exchangeOpen, setExchangeOpen] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
+
+  // Hidratación inicial: cargar contactos existentes al montar
+  useEffect(() => {
+    fetch('/api/contacts/me')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((contacts: { id_user: string }[]) => {
+        if (contacts.length) {
+          const initial: Record<string, ContactStatus> = {};
+          for (const c of contacts) initial[c.id_user] = 'added';
+          setContactMap(initial);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -79,13 +96,24 @@ export default function CommunityPage() {
     }
   }
 
-  function contactLabel(userId: string) {
-    const s = contactMap[userId] ?? 'idle';
-    if (s === 'loading') return 'Añadiendo…';
-    if (s === 'added') return 'Contacto añadido';
-    if (s === 'error') return 'Reintentar';
-    return 'Añadir como contacto';
+  async function handleRemoveContact() {
+    if (!selected) return;
+    setRemoveLoading(true);
+    try {
+      const res = await fetch(`/api/contacts/${selected.id_user}`, { method: 'DELETE' });
+      if (res.ok || res.status === 204) {
+        setContactMap((prev) => ({ ...prev, [selected.id_user]: 'idle' }));
+        setShowRemoveModal(false);
+      }
+    } finally {
+      setRemoveLoading(false);
+    }
   }
+
+  const isAdded = selected ? contactMap[selected.id_user] === 'added' : false;
+  const isContactLoading = selected
+    ? contactMap[selected.id_user] === 'loading' || removeLoading
+    : false;
 
   return (
     <div className="flex-1 flex h-full overflow-hidden">
@@ -186,50 +214,65 @@ export default function CommunityPage() {
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-7">
-                        <Link
-                          href={`/user/${selected.id_user}`}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 gradient-brand text-white rounded-xl text-sm font-bold shadow-brand hover:shadow-lg transition-all btn-press"
+                      <Link
+                        href={`/user/${selected.id_user}`}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 gradient-brand text-white rounded-xl text-sm font-bold shadow-brand hover:shadow-lg transition-all btn-press"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Ver perfil
+                      </Link>
+
+                      {isAdded ? (
+                        <button
+                          onClick={() => setShowRemoveModal(true)}
+                          disabled={isContactLoading}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all btn-press border bg-danger-soft border-red-200 text-red-700 hover:bg-red-100 disabled:cursor-not-allowed"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Ver perfil
-                        </Link>
+                          {isContactLoading ? (
+                            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                            </svg>
+                          )}
+                          Eliminar contacto
+                        </button>
+                      ) : (
                         <button
                           onClick={() => handleAddContact(selected.id_user)}
-                          disabled={contactMap[selected.id_user] === 'loading' || contactMap[selected.id_user] === 'added'}
+                          disabled={isContactLoading}
                           className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all btn-press border ${
-                            contactMap[selected.id_user] === 'added'
-                              ? 'bg-success-soft border-emerald-200 text-emerald-700'
-                              : contactMap[selected.id_user] === 'error'
+                            contactMap[selected.id_user] === 'error'
                               ? 'bg-danger-soft border-red-200 text-red-700'
                               : 'bg-surface border-hairline text-ink-soft hover:border-brand hover:text-brand'
                           } disabled:cursor-not-allowed`}
                         >
-                          {contactMap[selected.id_user] === 'loading' ? (
+                          {isContactLoading ? (
                             <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : contactMap[selected.id_user] === 'added' ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
                           ) : (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                             </svg>
                           )}
-                          <span>{contactLabel(selected.id_user)}</span>
+                          {contactMap[selected.id_user] === 'loading' ? 'Añadiendo…'
+                            : contactMap[selected.id_user] === 'error' ? 'Reintentar'
+                            : 'Añadir como contacto'}
                         </button>
-                        <button
-                          onClick={() => setExchangeOpen(true)}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm font-bold text-ink-soft hover:border-brand hover:text-brand transition-all btn-press"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                          </svg>
-                          Intercambio
-                        </button>
-                      </div>
+                      )}
+
+                      <button
+                        onClick={() => setExchangeOpen(true)}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-hairline rounded-xl text-sm font-bold text-ink-soft hover:border-brand hover:text-brand transition-all btn-press"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                        </svg>
+                        Intercambio
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -260,6 +303,17 @@ export default function CommunityPage() {
           onClose={() => setExchangeOpen(false)}
           targetUserId={selected.id_user}
           targetUserName={selected.full_name}
+        />
+      )}
+
+      {showRemoveModal && selected && (
+        <ConfirmDialog
+          title="Eliminar contacto"
+          message={<>¿Seguro que quieres eliminar a <span className="font-bold text-ink">{selected.full_name}</span> de tus contactos?</>}
+          confirmLabel="Eliminar"
+          loading={removeLoading}
+          onConfirm={handleRemoveContact}
+          onCancel={() => setShowRemoveModal(false)}
         />
       )}
     </div>

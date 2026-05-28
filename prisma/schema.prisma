@@ -153,6 +153,7 @@ model penalties {
   reason        String    @db.VarChar(500)
   given_at      DateTime  @default(now()) @db.Timestamp(6)
   expires_at    DateTime?
+  acknowledged  Boolean   @default(false)
 
   user     users      @relation("UserPenalties", fields: [id_user], references: [id_user], onDelete: Cascade)
   admin    users?     @relation("AdminPenalties", fields: [admin_id_user], references: [id_user])

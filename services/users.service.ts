@@ -168,7 +168,7 @@ export async function getUserReviews(userId: string) {
   if (!user) throw new NotFoundError('Usuario');
 
   const reviews = await prisma.reviews.findMany({
-    where: { written_to_user: userId },
+    where: { written_to_user: userId, is_flagged: false },
     orderBy: { date: 'desc' },
     include: {
       author: { select: { id_user: true, name: true, surnames: true, username: true } },

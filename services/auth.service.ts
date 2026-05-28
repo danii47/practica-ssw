@@ -73,11 +73,12 @@ export async function loginUser(body: Record<string, unknown>): Promise<AuthResu
 
   const user = await prisma.users.findUnique({
     where: { email },
-    select: { id_user: true, username: true, role: true, psw_hash: true, status: true },
+    select: { id_user: true, username: true, role: true, psw_hash: true, status: true, penalties_count: true },
   });
 
   if (!user) throw new UnauthorizedError('Credenciales incorrectas.');
   if (!user.status) throw new ForbiddenError('Esta cuenta ha sido suspendida.');
+  if (user.penalties_count >= 3) throw new ForbiddenError('Tu cuenta ha sido bloqueada permanentemente por infringir las normas reiteradamente.');
 
   const valid = await verifyPassword(body.password as string, user.psw_hash);
   if (!valid) throw new UnauthorizedError('Credenciales incorrectas.');

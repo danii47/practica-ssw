@@ -50,7 +50,7 @@ function HomePageContent() {
   const [filterType, setFilterType] = useState(() => searchParams.get('type') ?? '');
   const [filterTopic, setFilterTopic] = useState(() => searchParams.get('topic') ?? '');
   const [myId, setMyId] = useState<string | null>(null);
-  const [exchangeTarget, setExchangeTarget] = useState<{ id: string; name: string } | null>(null);
+  const [exchangeTarget, setExchangeTarget] = useState<{ id: string; name: string; activityId: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup debounce timer on unmount
@@ -318,7 +318,7 @@ function HomePageContent() {
                         </Link>
                       ) : (
                         <button
-                          onClick={() => setExchangeTarget({ id: activity.user.id_user, name: `${activity.user.name} ${activity.user.surnames}` })}
+                          onClick={() => setExchangeTarget({ id: activity.user.id_user, name: `${activity.user.name} ${activity.user.surnames}`, activityId: activity.id_activity })}
                           className="w-full py-2.5 bg-brand-soft text-brand rounded-xl text-sm font-bold hover:bg-brand hover:text-white transition-all btn-press flex items-center justify-center gap-2 group"
                         >
                           <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -342,6 +342,7 @@ function HomePageContent() {
           onClose={() => setExchangeTarget(null)}
           targetUserId={exchangeTarget.id}
           targetUserName={exchangeTarget.name}
+          initialRequestedActivityId={exchangeTarget.activityId}
         />
       )}
     </main>

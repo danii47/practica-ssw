@@ -5,6 +5,14 @@ import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 const PUBLIC_PATHS = ['/login', '/register'];
 const AUTH_PATHS = ['/login', '/register'];
 
+const ADMIN_ONLY = ['/moderation'];
+const USER_ONLY = ['/my-services', '/community', '/my-contacts', '/my-exchanges'];
+
+function isUserOnlyPath(pathname: string) {
+  if (pathname === '/') return true;
+  return USER_ONLY.some((p) => pathname.startsWith(p));
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(COOKIE_NAME)?.value;
@@ -24,6 +32,15 @@ export async function middleware(request: NextRequest) {
 
   if (session && isAuthPath) {
     return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (session) {
+    if (session.role === 'admin' && isUserOnlyPath(pathname)) {
+      return NextResponse.redirect(new URL('/moderation', request.url));
+    }
+    if (session.role !== 'admin' && ADMIN_ONLY.some((p) => pathname.startsWith(p))) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   return NextResponse.next();

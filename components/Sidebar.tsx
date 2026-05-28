@@ -77,55 +77,62 @@ export default function Sidebar({ user }: SidebarProps) {
   const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
   const isAdmin = user?.role === 'admin';
 
-  const navItems: NavItem[] = [
-    {
-      href: '/',
-      label: 'Inicio',
-      icon: ICON_HOME,
-      match: (p) => p === '/',
-    },
-    {
-      href: '/my-services',
-      label: 'Mis Servicios',
-      icon: ICON_SERVICES,
-      match: (p) => p.startsWith('/my-services'),
-    },
-    {
-      href: '/community',
-      label: 'Comunidad',
-      icon: ICON_COMMUNITY,
-      match: (p) => p.startsWith('/community'),
-    },
-    {
-      href: '/my-contacts',
-      label: 'Mis Contactos',
-      icon: ICON_CONTACTS,
-      match: (p) => p.startsWith('/my-contacts'),
-    },
-    {
-      href: '/my-exchanges',
-      label: 'Mis Intercambios',
-      icon: ICON_EXCHANGES,
-      match: (p) => p.startsWith('/my-exchanges'),
-    },
-    {
-      href: '/messages',
-      label: 'Mensajes',
-      icon: ICON_MESSAGES,
-      badge: <UnreadMessagesDot />,
-      match: (p) => p.startsWith('/messages'),
-    },
-  ];
-
-  if (isAdmin) {
-    navItems.push({
-      href: '/moderation',
-      label: 'Moderación',
-      icon: ICON_SHIELD,
-      match: (p) => p.startsWith('/moderation'),
-      danger: true,
-    });
-  }
+  const navItems: NavItem[] = isAdmin
+    ? [
+        {
+          href: '/moderation',
+          label: 'Moderación',
+          icon: ICON_SHIELD,
+          match: (p) => p.startsWith('/moderation'),
+          danger: true,
+        },
+        {
+          href: '/messages',
+          label: 'Mensajes',
+          icon: ICON_MESSAGES,
+          badge: <UnreadMessagesDot />,
+          match: (p) => p.startsWith('/messages'),
+        },
+      ]
+    : [
+        {
+          href: '/',
+          label: 'Inicio',
+          icon: ICON_HOME,
+          match: (p) => p === '/',
+        },
+        {
+          href: '/my-services',
+          label: 'Mis Servicios',
+          icon: ICON_SERVICES,
+          match: (p) => p.startsWith('/my-services'),
+        },
+        {
+          href: '/community',
+          label: 'Comunidad',
+          icon: ICON_COMMUNITY,
+          match: (p) => p.startsWith('/community'),
+        },
+        {
+          href: '/my-contacts',
+          label: 'Mis Contactos',
+          icon: ICON_CONTACTS,
+          match: (p) => p.startsWith('/my-contacts'),
+        },
+        {
+          href: '/my-exchanges',
+          label: 'Mis Intercambios',
+          icon: ICON_EXCHANGES,
+          match: (p) => p.startsWith('/my-exchanges'),
+        },
+        {
+          href: '/messages',
+          label: 'Mensajes',
+          icon: ICON_MESSAGES,
+          badge: <UnreadMessagesDot />,
+          match: (p) => p.startsWith('/messages'),
+        },
+      ];
 
   return (
     <aside className="w-20 bg-surface border-r border-hairline flex flex-col items-center py-5 shrink-0 z-30 relative">

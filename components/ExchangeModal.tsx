@@ -16,6 +16,7 @@ interface ExchangeModalProps {
   onClose: () => void;
   targetUserId: string;
   targetUserName: string;
+  initialRequestedActivityId?: number | null;
 }
 
 export default function ExchangeModal({
@@ -23,6 +24,7 @@ export default function ExchangeModal({
   onClose,
   targetUserId,
   targetUserName,
+  initialRequestedActivityId,
 }: ExchangeModalProps) {
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
   const [targetActivities, setTargetActivities] = useState<Activity[]>([]);
@@ -38,7 +40,7 @@ export default function ExchangeModal({
     setSuccess(false);
     setError('');
     setOfferedActivity('');
-    setRequestedActivity('');
+    setRequestedActivity(initialRequestedActivityId != null ? String(initialRequestedActivityId) : '');
     setFetchLoading(true);
 
     fetch('/api/auth/me')
@@ -60,7 +62,7 @@ export default function ExchangeModal({
       })
       .catch(() => setError('No se pudieron cargar las actividades. Recarga e inténtalo de nuevo.'))
       .finally(() => setFetchLoading(false));
-  }, [isOpen, targetUserId]);
+  }, [isOpen, targetUserId, initialRequestedActivityId]);
 
   useEffect(() => {
     if (!isOpen) return;
